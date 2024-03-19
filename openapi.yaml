@@ -159,7 +159,6 @@ components:
         - v5
     Version:
       type: object
-      description: Версия совместимости
       properties:
         major:
           type: integer
