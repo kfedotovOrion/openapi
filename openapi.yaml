@@ -49,9 +49,7 @@ components:
               items:
                 $ref: "#/components/schemas/Version"
         version:
-          description: Текущая версия совместимости
-          oneOf:
-            - $ref: "#/components/schemas/Version"
+          $ref: "#/components/schemas/Version"
     DataCenterStatus:
       type: string
       description: |
@@ -161,6 +159,7 @@ components:
         - v5
     Version:
       type: object
+      description: Версия совметсимости
       properties:
         major:
           type: integer
