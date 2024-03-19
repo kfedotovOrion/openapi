@@ -12,6 +12,159 @@ components:
     oauth2Auth:
       type: http
       scheme: oauth2
+  schemas:
+    DataCenter:
+      type: object
+      required:
+        - name
+        - local
+      properties:
+        comment:
+          type: string
+          description: Комментарий в виде свободного текста
+        description:
+          type: string
+          description: Описание сущности
+        id:
+          type: string
+          description: Уникальный идентификатор
+        local:
+          type: boolean
+          description: Указывает, использует ли центр данных локальное хранилище.
+        name:
+          type: string
+          description: Имя центра данных
+        quota_mode:
+          $ref: "#/components/schemas/QuotaMode"
+        status:
+          $ref: "#/components/schemas/DataCenterStatus"
+        storage_format:
+          $ref: "#/components/schemas/StorageFormat"
+        supported_versions:
+          type: object
+          description: Поддерживаемые версии совместимости
+          properties:
+            version:
+              type: array
+              items:
+                $ref: "#/components/schemas/Version"
+        version:
+          description: Текущая версия совместимости
+          $ref: "#/components/schemas/Version"
+    DataCenterStatus:
+      type: string
+      description: |
+        Описывает возможные статусы центра данных. Допустимые значения:
+
+        - `contend` - Конкурирует
+        - `maintenance` - В обслуживании.
+        - `not_operational` - Имеет некорректную конфигурацию.
+        - `problematic` - Это некорректный статус, который центр данных не должен принимать. Как правило указывает на ошибки в бекенде.
+        - `uninitialized` - Не инициализирован.
+        - `up` - Активен.
+      enum:
+        - contend
+        - maintenance
+        - not_operational
+        - problematic
+        - uninitialized
+        - up
+    IscsiBond:
+      type: object
+      properties:
+        description:
+          type: string
+          description: Описание бонда
+        name:
+          type: string
+          description: Имя бонда
+        id:
+          type: string
+          description: Уникальный идентификатор бонда
+        data_center:
+          type: object
+          description: Центр данных, для которого создан бонд iSCSI
+          properties:
+            id:
+              type: string
+              description: Идентификатор центра данных
+        networks:
+          type: object
+          description: Список сетей, подключенных к бонду iSCSI
+          properties:
+            network:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    description: Идентификатор сети
+        storage_connections:
+          type: object
+          description: Список подключений к хранилищу, включенных в бонд iSCSI
+          properties:
+            storage_connection:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    description: Идентификатор подключения к хранилищу
+    Network:
+      type: object
+      description: Представляет логическую сеть
+      properties:
+        comment:
+          type: string
+          description: Свободный комментарий об объекте
+        description:
+          type: string
+          description: Описание бонда
+        name:
+          type: string
+          description: Имя бонда
+        id:
+          type: string
+          description: Уникальный идентификатор бонда
+    QuotaMode:
+      type: string
+      description: |
+        Описывает возможные режимы квотирования. Допустимые значения:
+
+        - `audit` - режим аудита
+        - `disabled` - квотирование выключено
+        - `enabled` - принудительное квотирование
+      enum:
+        - audit
+        - disabled
+        - enabled
+    StorageFormat:
+      type: string
+      description: |
+        Описывает формат метаданных хранилища. Допустимы следующие значения:
+
+        - `v1` - Версия 1 формата домена хранения. Применима к доменам хранения NFS, iSCSI и FC.
+        - `v2` - Версия 2 формата домена хранения. Применима к доменам хранения iSCSI и FC.
+        - `v3` - Версия 3 формата домена хранения. Применима к доменам хранения NFS, POSIX, iSCSI и FC.
+        - `v4` - Версия 4 формата домена хранения.
+        - `v5` - Версия 5 формата домена хранения. Применима к доменам хранения NFS, POSIX и Gluster.
+
+        Подробнее о форматах метаданных см. в [Техническом справочнике](https://wiki.orionsoft.ru/ru/zvirt/latest/tech-guide.adoc#_версии_метаданных_хранилища_в_zvirt)
+      enum:
+        - v1
+        - v2
+        - v3
+        - v4
+        - v5
+    Version:
+      type: object
+      properties:
+        major:
+          type: integer
+        minor:
+          type: integer
 security:
   - oauth2Auth: []
 tags:
@@ -131,12 +284,12 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              example:
-                name: DevDC
-                description: Datacenter for developer's VM
-                quota_mode: audit
-                local: false
+              $ref: "#/components/schemas/DataCenter"
+            example:
+              name: DevDC
+              description: Datacenter for developer's VM
+              quota_mode: audit
+              local: false
       parameters:
         - name: Accept
           in: header
@@ -148,13 +301,18 @@ paths:
           schema:
             type: string
           example: application/json
+        - name: DataCenter
+          in: query
+          required: true
+          schema:
+            $ref: "#/components/schemas/DataCenter"
       responses:
         '201':
           description: Created
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/DataCenter"
               example:
                 local: 'false'
                 quota_mode: audit
@@ -260,6 +418,11 @@ paths:
             application/json:
               schema:
                 type: object
+                properties:
+                  data_center:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/DataCenter"
               example:
                 data_center:
                   - local: 'false'
@@ -330,7 +493,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/DataCenter"
               example:
                 local: 'false'
                 quota_mode: enabled
@@ -396,9 +559,9 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              example:
-                quota_mode: enabled
+              $ref: "#/components/schemas/DataCenter"
+            example:
+              quota_mode: enabled
       parameters:
         - name: Accept
           in: header
@@ -410,13 +573,18 @@ paths:
           schema:
             type: boolean
           example: 'false'
+        - name: data_center
+          in: query
+          required: true
+          schema:
+            $ref: "#/components/schemas/DataCenter"
       responses:
         '200':
           description: OK
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/DataCenter"
               example:
                 local: 'false'
                 quota_mode: enabled
@@ -564,15 +732,15 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              example:
-                name: new-bond
-                storage_connections:
-                  storage_connection:
-                    - id: 777caf4b-b91c-4542-b825-10d4426b5066
-                networks:
-                  network:
-                    - id: f9dfdcd8-4e78-4109-82ec-01b5473b4f6a
+              $ref: "#/components/schemas/IscsiBond"
+            example:
+              name: new-bond
+              storage_connections:
+                storage_connection:
+                  - id: 777caf4b-b91c-4542-b825-10d4426b5066
+              networks:
+                network:
+                  - id: f9dfdcd8-4e78-4109-82ec-01b5473b4f6a
       parameters:
         - name: Accept
           in: header
@@ -584,13 +752,18 @@ paths:
           schema:
             type: string
           example: application/json
+        - name: IscsiBond
+          in: query
+          required: true
+          schema:
+            $ref: "#/components/schemas/IscsiBond"
       responses:
         '201':
           description: Created
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/IscsiBond"
               example:
                 data_center:
                   href: >-
@@ -661,6 +834,11 @@ paths:
             application/json:
               schema:
                 type: object
+                properties:
+                  iscsi_bond:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/IscsiBond"
               example:
                 iscsi_bond:
                   - data_center:
@@ -712,7 +890,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/IscsiBond"
               example:
                 data_center:
                   href: >-
@@ -748,9 +926,9 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              example:
-                name: data-bond
+              $ref: "#/components/schemas/IscsiBond"
+            example:
+              name: data-bond
       parameters:
         - name: Accept
           in: header
@@ -768,13 +946,18 @@ paths:
             type: boolean
           description: Указывает, должна ли операция выполняться асинхронно.
           example: 'false'
+        - name: IscsiBond
+          in: query
+          required: true
+          schema:
+            $ref: "#/components/schemas/IscsiBond"
       responses:
         '200':
           description: OK
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/IscsiBond"
               example:
                 data_center:
                   href: >-
