@@ -68,8 +68,20 @@ components:
         - problematic
         - uninitialized
         - up
+    Fault:
+      type: object
+      description: Описывает ошибку при выполнении запроса
+      properties:
+        detail:
+          type: string
+          description: Подробное описание ошибки
+        reason:
+          type: string
+          description: Причина возникновения ошибки
     IscsiBond:
       type: object
+      required:
+        - name
       properties:
         description:
           type: string
@@ -111,22 +123,172 @@ components:
                   id:
                     type: string
                     description: Идентификатор подключения к хранилищу
+    JobOK:
+      type: object
+      properties:
+        job:
+          type: object
+          properties:
+            id:
+              type: string
+              description: Идентификатор связанной задачи
+            href:
+              type: string
+              description: Ссылка на связанную задачу
+        status:
+          type: string
+          description: Статус связанной задачи
     Network:
       type: object
       description: Представляет логическую сеть
+      required:
+        - name
+        - data_center
       properties:
         comment:
           type: string
           description: Свободный комментарий об объекте
         description:
           type: string
-          description: Описание бонда
+          description: Описание объекта
+        dns_resolver_configuration:
+          type: object
+          description: Конфигурация DNS
+          properties:
+            name_servers:
+              type: array
+              description: Список адресов DNS
+              items:
+                type: string
         name:
           type: string
-          description: Имя бонда
+          description: Имя логической сети
         id:
           type: string
-          description: Уникальный идентификатор бонда
+          description: Уникальный идентификатор
+        mtu:
+          type: integer
+          description: Значение MTU для логической сети
+        port_isolation:
+          type: boolean
+          description: |
+            Определяет, будет ли блокироваться в этой сети связь между виртуальными машинами, работающими на одном хосте.
+
+            Применяется только к сетям ВМ. Обеспечение блокировки связи между несколькими хостами возлагается на 
+            администратора сети. Этот атрибут может быть установлен только при создании сети и не может быть 
+            отредактирован. Если значение не установлено, связь между виртуальными машинами, работающими на одном 
+            хосте, разрешена.
+        profile_required:
+          type: boolean
+          description: Указывает, должен ли при создании сети автоматически создаваться профиль vNIC.
+        required:
+          type: boolean
+          description: |
+            Определяет, является ли сеть обязательной для всех хостов в кластере.
+
+            Этот параметр используется только при подключении сети к кластеру.
+        status:
+          type: string
+          description: |
+            Отображает статус логической сети, подключенной к кластеру
+            
+            Возможные значения:
+
+            - `non_operational` - Возникает в случае, если сеть с атрибутом `required: true` не назначена ни одному 
+            активному хосту в кластере.
+            - `operational` - Работоспособна
+          enum:
+            - non_operational
+            - operational
+        stp:
+          type: boolean
+          description: Указывает, включен ли в сети протокол STP.
+        usages:
+          type: object
+          description: Роли логической сети.
+          properties:
+            usage:
+              type: array
+              description: |
+                Список ролей определенных для логической сети.
+
+                Возможные значения:
+
+                - `default_route` - Шлюз по умолчанию и конфигурация DNS-резолвера хоста будут взяты из этой сети.
+
+                  Если эта сеть присоединена к хосту, то конфигурация DNS-резолвера будет взята из атрибута 
+                  `dns_resolver_configuration` присоединенной сети. Если в приложении сети нет атрибута `dns_resolver_configuration`, 
+                  то они будут взяты из `dns_resolver_configuration` самой сети. Если атрибут `dns_resolver_configuration` не 
+                  присутствует даже там, конфигурация DNS-резолвера не будет установлена.
+                - `display` - Сеть используется для трафика SPICE и VNC.
+                - `gluster` - Сеть используется для трафика Gluster.
+                - `management` - Сеть используется для связи между Менеджером управления и хостами. По умолчанию эта роль принадлежит сети ovirtmgmt.
+                - `migration` - Сеть используется для миграции ВМ.
+                - `vm` - Сеть используется для трафика виртуальных машин.
+              items:
+                $ref: "#/components/schemas/NetworkUsage"
+        vdsm_name:
+          type: string
+          description: |
+            Имя сети, используемое на хосте.
+
+            Это альтернативное имя автоматически генерируется VDSM, когда сетевое имя оказывается непригодным для 
+            использования в качестве имени моста на хосте. Неподходящие имена содержат пробелы, специальные символы 
+            или имеют длину более 15 символов и заменяются UUID на хосте. Этот параметр доступен только для чтения. 
+            Его установка не имеет никакого эффекта.
+        vlan:
+          type: object
+          description: Тег VLAN.
+          properties:
+            id:
+              type: integer
+        data_center:
+          type: object
+          properties:
+            id:
+              type: string
+              description: Центр данных, которому принадлежит сеть
+        cluster:
+          type: object
+          properties:
+            id:
+              type: string
+              description: Кластер, к которому подключена сеть. Отображается только при GET-запросе к сетям кластера.
+        external_provider:
+          type: object
+          properties:
+            id:
+              type: string
+              description: Идентификатор внешнего провайдера, использованного для сети.
+        network_labels:
+          type: object
+          description: Назначеные метки сети. Параметр отображается только при GET-запросах к сетям на верхнем уровне (`/ovirt-engine/api/networks`).
+          properties:
+            network_label:
+              type: array
+              description: Параметры метки сети.
+              items:
+                type: object
+                properties:
+                  network:
+                    type: object
+                    description: Сеть, для которой определена метка
+                    properties:
+                      id:
+                        type: string
+                        description: Идентификатор сети
+                  id:
+                    type: string
+                    description: Идентификатор метки сети
+    NetworkUsage:
+      type: string
+      enum:
+        - default_route
+        - display
+        - gluster
+        - management
+        - migration
+        - vm
     QuotaMode:
       type: string
       description: |
@@ -300,11 +462,6 @@ paths:
           schema:
             type: string
           example: application/json
-        - name: DataCenter
-          in: query
-          required: true
-          schema:
-            $ref: "#/components/schemas/DataCenter"
       responses:
         '201':
           description: Created
@@ -572,11 +729,6 @@ paths:
           schema:
             type: boolean
           example: 'false'
-        - name: data_center
-          in: query
-          required: true
-          schema:
-            $ref: "#/components/schemas/DataCenter"
       responses:
         '200':
           description: OK
@@ -665,7 +817,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/JobOK"
               example:
                 job:
                   href: /ovirt-engine/api/jobs/83b826a5-bef1-4e19-8d7a-44fca933254f
@@ -713,7 +865,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/JobOK"
               example:
                 job:
                   href: /ovirt-engine/api/jobs/4cfb88de-6b73-44a3-9a22-ddd99aa52c02
@@ -751,11 +903,6 @@ paths:
           schema:
             type: string
           example: application/json
-        - name: IscsiBond
-          in: query
-          required: true
-          schema:
-            $ref: "#/components/schemas/IscsiBond"
       responses:
         '201':
           description: Created
@@ -794,7 +941,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/Fault"
               example:
                 detail: >-
                   [Cannot add iSCSI Bond. The following Logical Networks:
@@ -945,11 +1092,6 @@ paths:
             type: boolean
           description: Указывает, должна ли операция выполняться асинхронно.
           example: 'false'
-        - name: IscsiBond
-          in: query
-          required: true
-          schema:
-            $ref: "#/components/schemas/IscsiBond"
       responses:
         '200':
           description: OK
@@ -1007,6 +1149,10 @@ paths:
             application/json:
               schema:
                 type: object
+                properties:
+                  status:
+                    type: string
+                    description: Статус выполнения запроса
               example:
                 status: complete
   /ovirt-engine/api/datacenters/{datacenter:id}/iscsibonds/{iscsibond:id}/networks:
@@ -1025,10 +1171,19 @@ paths:
           application/json:
             schema:
               type: object
-              example:
-                id: 5376b7a0-6413-4e56-8865-0ca65607566c
+              properties:
+                id:
+                  type: string
+                  description: Идентификатор подключаемой логической сети.
+            example:
+              id: 5376b7a0-6413-4e56-8865-0ca65607566c
       parameters:
         - name: Accept
+          in: header
+          schema:
+            type: string
+          example: application/json
+        - name: Content-Type
           in: header
           schema:
             type: string
@@ -1040,6 +1195,10 @@ paths:
             application/json:
               schema:
                 type: object
+                properties:
+                  status:
+                    type: string
+                    description: Результат выполнения запроса
               example:
                 status: complete
   /ovirt-engine/api/datacenters/{datacenter:id}/iscsibonds/{iscsibond:id}/storageserverconnections:
@@ -1058,8 +1217,12 @@ paths:
           application/json:
             schema:
               type: object
-              example:
-                id: 777caf4b-b91c-4542-b825-10d4426b5066
+              properties:
+                id:
+                  type: string
+                  description: Идентификатор добавляемого подключения к хранилищу.
+            example:
+              id: 777caf4b-b91c-4542-b825-10d4426b5066
       parameters:
         - name: Accept
           in: header
@@ -1073,9 +1236,17 @@ paths:
           example: application/json
       responses:
         '200':
-          description: Successful response
+          description: OK
           content:
-            application/json: {}
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    description: Результат выполнения запроса
+              example:
+                status: complete
   /ovirt-engine/api/datacenters/{datacenter:id}/networks:
     post:
       tags:
@@ -1084,18 +1255,21 @@ paths:
       description: >-
         Создаёт в центре данных сеть с параметрами, значения которых переданы в
         теле запроса.
+
+        При создании сети с помощью этого запроса, не нужно в теле запроса передавать 
+        идентификатор центра данных, в котором создается сеть.
       requestBody:
         content:
           application/json:
             schema:
-              type: object
-              example:
-                name: dc_network
-                description: Vm network
-                usages:
-                  usage:
-                    - vm
-                mtu: '1500'
+              $ref: "#/components/schemas/Network"
+            example:
+              name: dc_network
+              description: Vm network
+              usages:
+                usage:
+                  - vm
+              mtu: '1500'
       parameters:
         - name: Accept
           in: header
@@ -1113,7 +1287,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/Network"
               example:
                 mtu: '1500'
                 port_isolation: 'false'
@@ -1156,6 +1330,12 @@ paths:
             application/json:
               schema:
                 type: object
+                properties:
+                  network:
+                    type: array
+                    description: Список сетей
+                    items:
+                      $ref: "#/components/schemas/Network"
               example:
                 network:
                   - mtu: '0'
@@ -1214,7 +1394,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/Network"
               example:
                 mtu: '1500'
                 port_isolation: 'false'
@@ -1242,9 +1422,9 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              example:
-                comment: isolated network
+              $ref: "#/components/schemas/Network"
+            example:
+              comment: isolated network
       parameters:
         - name: Accept
           in: header
@@ -1262,7 +1442,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/Network"
               example:
                 mtu: '1500'
                 port_isolation: 'false'
@@ -1298,7 +1478,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/JobOK"
               example:
                 job:
                   href: /ovirt-engine/api/jobs/ac7882d3-17f6-41da-8071-d1d8d9af6075
