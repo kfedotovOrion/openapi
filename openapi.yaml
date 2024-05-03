@@ -13,8 +13,258 @@ components:
       type: http
       scheme: oauth2
   schemas:
+    BiosType:
+      description: |
+        Представляет комбинацию чипсета и типа BIOS.
+
+        Допустимые значения:
+
+        - `cluster_default` - Использовать значение, установленное для кластера. Это значение применяется для ВМ.
+        - `i440fx_sea_bios` - Чипсет i440fx с SeaBIOS.
+        - `q35_ovmf` - Чипсет q35 с OVMF BISO (UEFI).
+        - `q35_sea_bios` - Чипсет q35 с SeaBIOS.
+        - `q35_secure_boot` - Чипсет q35 с OVMF BISO (UEFI) и включенной функцией SecureBoot.
+      type: string
+      enum:
+        - cluster_default
+        - i440fx_sea_bios
+        - q35_ovmf
+        - q35_sea_bios
+        - q35_secure_boot
+    Certificate:
+      description: Описывает параметры сертификата
+      type: object
+      properties:
+        content:
+          description: Содержимое сертификата
+          type: string
+        id:
+          description: Уникальный идентификатор
+          type: string
+        name:
+          description: Имя сертификата
+          type: string
+        organization:
+          description: Наименование организации
+          type: string
+        subject:
+          description: Наименование субъекта
+          type: string
+    Cluster:
+      description: Описывает параметры кластера
+      type: object
+      required:
+        - name
+        - data_center
+        - cpu
+      properties:
+        ballooning_enabled:
+          description: Указывает, включен ли в кластере баллунинг
+          type: boolean
+        bios_type:
+          $ref: "#/components/schemas/BiosType"
+        comment:
+          type: string
+          description: Комментарий в виде свободного текста
+        cpu:
+          $ref: "#/components/schemas/Cpu"
+        custom_scheduling_policy_properties:
+          description: |
+            Пользовательские свойства политики планирования кластера.
+
+            Эти необязательные свойства переопределяют свойства политики планирования, указанной 
+            параметром `scheduling_policy`.
+          type: object
+          properties:
+            property:
+              type: array
+              description: Список пользовательских свойств
+              items:
+                $ref: "#/components/schemas/Property"
+        description:
+          type: string
+          description: Описание сущности
+        display:
+          $ref: "#/components/schemas/Display"
+        error_handling:
+          $ref: "#/components/schemas/ErrorHandling"
+        fencing_policy:
+          $ref: "#/components/schemas/FencingPolicy"
+        firewall_type:
+          description: |
+            Тип межсетевого экрана, используемого в кластере.
+
+            *Важно*: zVirt поддерживает только firewalld
+          type: string
+          enum:
+            - firewalld
+            - iptables
+        gluster_service:
+          description: |
+            Если значение True, хосты в этом кластере будут использоваться в качестве серверных узлов 
+            Gluster Storage, а не для запуска виртуальных машин.
+
+            По умолчанию кластер создается для хостов виртуальных машин.
+          type: boolean
+        gluster_tuned_profile:
+          description: |
+            Имя профиля Gluster, которое необходимо установить на всех хостах кластера. 
+            Не является обязательным и актуально только для кластеров с сервисом Gluster.
+          type: string
+        ha_reservation:
+          description: Если значение True, это позволяет Менеджеру контролировать емкость кластера для высокодоступных виртуальных машин.
+          type: boolean
+        id:
+          type: string
+          description: Уникальный идентификатор
+        ksm:
+          description: Определяет параметры KSM
+          type: object
+          properties:
+            enabled:
+              description: Состояние KSM
+              type: boolean
+            merge_across_nodes:
+              description: При значении True включает распределение страниц по всей доступной памяти
+              type: boolean
+        log_max_memory_used_threshold:
+          description: Порог потребления памяти для регистрации событий журнала аудита.
+          type: integer
+        log_max_memory_used_threshold_type:
+          description: Единица измерения для log_max_memory_used_threshold
+          type: string
+          enum:
+            - absolute_value_in_mb
+            - percentage
+        name:
+          type: string
+          description: Имя кластера
+    Core:
+      description: Описывает характеристики ядра ЦП
+      type: object
+      properties:
+        index:
+          description: Уникальный индекс ядра
+          type: integer
+        socket:
+          description: Номер сокета
+          type: integer
+    Cpu:
+      description: |
+        Описывает параметры CPU.
+
+        *Важно*: Список отображаемых параметров зависит от родительского объекта.
+        Например, в параметрах кластера отображаются только архитектура и тип.
+      type: object
+      properties:
+        architecture:
+          description: |
+            Архитектура CPU.
+
+            *ВАЖНО*: На текущий момент zVirt поддерживает только x86_64
+          type: string
+          enum:
+            - aarch64
+            - ppc64
+            - s390x
+            - undefined
+            - x86_64
+        cores:
+          type: object
+          properties:
+            core:
+              description: Список ядер ЦП
+              type: array
+              items:
+                $ref: "#/components/schemas/Core"
+        cpu_tune:
+          $ref: '#/components/schemas/CpuTune'
+        level:
+          type: integer
+        mode:
+          $ref: '#/components/schemas/CpuMode'
+        speed:
+          description: Тактовая частота процессора.
+          type: number
+        topology:
+          $ref: '#/components/schemas/CpuTopology'
+        type:
+          description: Кодовое имя (семейство) ЦП
+          type: string
+    CpuMode:
+      description: |
+        Режим процессора виртуальной машины. Он может быть одним из следующих: host_passthrough, 
+        host_model или custom.
+
+        Для типа процессора host_passthrough необходимо установить политику размещения (placement_policy) 
+        в значение pinned.
+
+        Если значение не указано, то используется значение по умолчанию, установленное Менеджером
+      type: string
+      enum:
+        - custom
+        - host_model
+        - host_passthrough
+    CpuPinningPolicy:
+      description: |
+        Описывает политики закрепления CPU и NUMA
+
+        Допустимые значения:
+
+        - `dedicated` - Закрепление ЦП будет автоматически рассчитано Менеджером при запуске виртуальной машины и 
+        сброшено при её остановке.  
+        Закрепление является эксклюзивным, что означает, что никакая другая виртуальная машина не может 
+        использовать привязанный физический процессор.
+        - `isolate_threads` - Закрепление ЦП будет автоматически рассчитано Менеджером при запуске виртуальной 
+        машины, и оно будет снято при её остановке.  
+        Закрепление является эксклюзивным, каждый виртуальный поток получит эксклюзивное использование 
+        физического ядра. Это означает, что никакая другая виртуальная машина не сможет использовать 
+        закреплённый физический процессор.
+        - `manual` - Закрепление ЦП будет настроено вручную.  
+        На данный момент это означает, что закрепление ЦП будет настроено вручную согласно текущей 
+        конфигурации виртуальной машины. Виртуальная машина должна быть закреплена хотя бы за одним хостом. 
+        Закрепление производится в рамках конфигурации ЦП с использованием параметра `CpuTune`.
+        - `none` - Закрепление ЦП не будет настроено.  
+        Это означает, что закрепление ЦП не будет применено к текущей конфигурации виртуальной машины. 
+        По умолчанию топология виртуальной машины устанавливается с 1 сокетом, 1 ядром и 1 потоком.
+        - `resize_and_pin_numa` - Закрепление ЦП и NUMA будет настроено выделенным хостом.  
+        Закрепление ЦП и NUMA будет использовать топологию ЦП выделенного хоста. 
+        Конфигурация виртуальной машины будет автоматически настроена таким образом, чтобы соответствовать 
+        параметрам хоста для достижения максимально возможной производительности.
+      type: string
+      enum:
+        - dedicated
+        - isolate_threads
+        - manual
+        - none
+        - resize_and_pin_numa
+    CpuTopology:
+      description: Описывает топологию CPU для ВМ.
+      type: object
+      properties:
+        cores:
+          description: Количество ядер
+          type: integer
+        sockets:
+          description: Количество сокетов
+          type: integer
+        threads:
+          description: Количество потоков на ядро
+          type: integer
+    CpuTune:
+      type: object
+      properties:
+        vcpu_pins:
+          type: object
+          properties:
+            vcpu_pin:
+              description: Список закрепленных vCPU
+              type: array
+              items:
+                $ref: "#/components/schemas/VcpuPin"
     DataCenter:
       type: object
+      description: Описывает параметры центра данных
       required:
         - name
         - local
@@ -68,6 +318,144 @@ components:
         - problematic
         - uninitialized
         - up
+    Display:
+      description: |
+        Описывает параметры конфигурации графической консоли.
+
+        Список параметров зависит от объекта, в рамках которого используется тип Display.
+      type: object
+      properties:
+        address:
+          description: IP-адрес гостевой ОС, к которому необходимо подключить клиент графической консоли.
+          type: string
+        allow_override:
+          description: |
+            Указывает, нужно ли переопределять адрес отображения для каждого хоста. 
+            Актуально только для атрибута `Host.display`. Если установлено, адрес графической консоли виртуальной 
+            машины будет переопределяться адресом отображения, указанным хостом. Если не установлено, 
+            адрес графической консоли виртуальной машины переопределяться не будет.
+          type: boolean
+        certificate:
+          $ref: "#/components/schemas/Certificate"
+        copy_paste_enabled:
+          description: |
+            Указывает, может ли пользователь копировать и вставлять содержимое с внешнего 
+            узла в графическую консоль. Этот параметр доступен только для типа консоли SPICE.
+          type: boolean
+        disconnect_action:
+          description: |
+            Определяет действие, которое произойдет при отключении графической консоли. 
+            Возможны следующие варианты:
+
+            - `none` - Никаких действий не происходит.
+            - `lock_screen` - Блокирует активную в данный момент сессию пользователя.
+            - `logout` - Выход из активного сеанса пользователя.
+            - `reboot` - Инициирует корректную перезагрузку виртуальной машины.
+            - `shutdown` - Инициирует корректное выключение виртуальной машины.
+
+            Этот параметр доступен только для типа консоли SPICE.
+          type: string
+          enum:
+            - none
+            - lock_screen
+            - logout
+            - reboot
+            - shutdown
+        disconnect_action_delay:
+          description: |
+            Задержка (в минутах) перед выполнением действия отключения графической консоли. Этот параметр 
+            доступен только для действия отключения Shutdown.
+          type: integer
+        file_transfer_enabled:
+          description: |
+            Указывает, может ли пользователь перетаскивать файлы с внешнего хоста в графическую консоль. 
+            Этот параметр доступен только для типа консоли SPICE.
+          type: boolean
+        keyboard_layout:
+          description: |
+            Раскладка клавиатуры, используемая в данной графической консоли. Этот параметр доступен только 
+            для консоли типа VNC.
+          type: string
+        monitors:
+          description: |
+            Количество мониторов, доступных для данной графической консоли. Этот параметр доступен только для 
+            консоли типа SPICE. Возможные значения: 1, 2 или 4.
+          type: integer
+        port:
+          description: Адрес порта на гостевой ОС для подключения клиента графической консоли.
+          type: integer
+        proxy:
+          description: |
+            IP-адрес прокси-сервера, который будет использоваться клиентом графической консоли для подключения к 
+            гостевой ОС. Это полезно, когда клиент находится за пределами сети гостевой ОС. Эта опция доступна 
+            только для типа консоли SPICE. Прокси может быть установлен в глобальной конфигурации, на уровне 
+            кластера, на уровне пула виртуальных машин или отключен для каждой виртуальной машины. Если прокси 
+            установлен в любом из указанных мест и не отключен для виртуальной машины, он будет возвращен этим 
+            методом.
+          type: string
+        secure_port:
+          description: Адрес защищенного порта на гостевой ОС в случае использования TLS для подключения клиента графической консоли.
+          type: integer
+        single_qxl_pci:
+          deprecated: true
+          description: |
+            Менеджер устанавливает его автоматически в зависимости от операционной системы. 
+            Поэтому начиная с версии zVirt 3.0 параметр является устаревшим.
+            
+            Указывает, использовать ли один слот PCI для каждого монитора или использовать один канал PCI 
+            для всех мониторов. Эта опция доступна только для типа консоли SPICE и только при подключении 
+            гостевой ОС на базе Linux.
+          type: boolean
+        smartcard_enabled:
+          description: |
+            Указывает, использовать ли аутентификацию с помощью смарт-карты. 
+            Этот параметр доступен только для типа консоли SPICE.
+          type: boolean
+        type:
+          $ref: "#/components/schemas/DisplayType"
+    DisplayType:
+      description: Представляет список протоколов для графических консолей ВМ.
+      type: string
+      enum:
+        - spice
+        - vnc
+    ErrorHandling:
+      description: Описывает параметры обработчика ошибок. 
+      type: object
+      properties:
+        on_error:
+          description: |
+            Действие при ошибке, обеспечивающее политику отказоустойчивости.
+
+            Допустимые значения:
+
+            - `do_not_migrate` - Предотвращает миграцию виртуальных машин.
+            - `migrate` - Мигрирует все виртуальные машины в порядке их определенного приоритета.
+            - `migrate_highly_available` - Мигрирует только высокодоступные виртуальные машины, чтобы не перегружать другие узлы.
+          type: string
+          enum:
+            - do_not_migrate
+            - migrate
+            - migrate_highly_available
+    ExternalStatus:
+      type: string
+      description: |
+        Описывает внешний статус объекта. В настоящее время этот статус используется для хостов и доменов хранения и 
+        позволяет внешней системе обновлять статус объектов, о которых она знает.
+
+        Возможные значения:
+
+        - `error` - указывает на наличие ошибок
+        - `failure` - указывает на общий отказ объекта
+        - `info` - указывает на нормальное состояние объекта и наличие информационного уведомления
+        - `ok` - нормальное состояние
+        - `warning` - указывает на наличие предупреждений
+      enum:
+        - error
+        - failure
+        - info
+        - ok
+        - warning
     Fault:
       type: object
       description: Описывает ошибку при выполнении запроса
@@ -78,6 +466,131 @@ components:
         reason:
           type: string
           description: Причина возникновения ошибки
+    FencingPolicy:
+      description: Описывает параметры политики ограждения
+      type: object
+      properties:
+        enabled:
+          description: |
+            При значении True включается ограждение на кластере.
+
+            По умолчанию ограждение включено.
+          type: boolean
+        skip_if_connectivity_broken:
+          description: |
+            Позволяет отключить ограждение, если процент хостов в кластере, 
+            испытывающих проблемы с подключением, больше или равен заданному порогу. Это необходимо для того, чтобы 
+            предотвратить fencing-шторм в случаях, когда в кластере возникают проблемы с глобальной сетью.
+
+            Порог может быть задан параметром `threshold`.
+          type: object
+          properties:
+            enabled:
+              description: При значении `true` отключает ограждение
+              type: boolean
+            threshold:
+              description: Порог неудачных тестов соединения.
+              type: integer
+        skip_if_gluster_bricks_up:
+          description: |
+            Флаг, указывающий, следует ли пропускать ограждение, если на ограждаемом хосте запущены брики Gluster.
+
+            Этот флаг необязателен, и по умолчанию его значение равно `false`.
+          type: boolean
+        skip_if_gluster_quorum_not_met:
+          description: |
+            Флаг, указывающий, следует ли пропускать ограждение, если брики Gluster уже работают и 
+            кворум Gluster не будет достигнут без них.
+
+            Этот флаг необязателен, и по умолчанию его значение равно `false`.
+          type: boolean
+        skip_if_sd_active:
+          description: |
+            Если эта опция включена, ограждение не выполняется, если хост сохраняет подключение к хранилище.
+          type: object
+          properties:
+            enabled:
+              description: Статус флага
+              type: boolean
+    HostStorage:
+      description: |
+        Описывает параметры подключения к объекту домену хранения.
+
+        Список параметров может отличаться в зависимости от типа домена хранения.
+      type: object
+      required:
+        - type
+      properties:
+        address:
+          description: |
+            IP-адрес хранилища. 
+            
+            При типе хранилища iscsi данный параметр указывается в списке `logical_units`.
+          type: string
+        driver_options:
+          description: Параметры подключения для драйвера Cinder
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+                description: Имя параметра
+              value:
+                type: string
+                description: Значение параметра
+        driver_sensitive_options:
+          description: |
+            Параметры, содержащие конфиденциальную информацию и передаваемые при создании 
+            домена хранения с помощью драйвера cinder. При сохранении эти параметры шифруются.
+          type: array
+          items:
+            $ref: "#/components/schemas/Property"
+        id:
+          description: Уникальный идентификатор
+          type: string
+        logical_units:
+          description: Список LUN в случае подключения к блочному хранилищу FC.
+          type: object
+          properties:
+            logical_unit:
+              type: array
+              items:
+                $ref: '#/components/schemas/LogicalUnit'
+            id:
+              description: Идентификатор группы томов.
+        mount_options:
+          description: Опции монтирования для NFS и POSIX
+          type: string
+        nfs_retrans:
+          description: |
+            Количество повторных попыток запроса перед тем, как приступить к дальнейшим действиям по восстановлению. 
+            Значение должно находиться в диапазоне от 0 до 65535.
+          type: integer
+        nfs_timeo:
+          description: Время в десятых долях секунды для ожидания ответа перед повторным запросом NFS.
+          type: integer
+        nfs_version:
+          description: Используемая версия NFS
+          type: string
+          enum:
+            - auto
+            - v3
+            - v4
+            - v4_0
+            - v4_1
+            - v4_2
+        override_luns:
+          description: Указывает, стоит ли переопределять LUN перед добавлением
+          type: boolean
+        type:
+          $ref: "#/components/schemas/StorageType"
+        vfs_type:
+          description: Тип виртуальной файловой системы для POSIX
+          type: string
+        volume_group:
+          $ref: '#/components/schemas/VolumeGroup'
+    
     IscsiBond:
       type: object
       required:
@@ -138,6 +651,82 @@ components:
         status:
           type: string
           description: Статус связанной задачи
+    LogicalUnit:
+      description: Описывает параметры конкретного LUN.
+      type: object
+      properties:
+        address:
+          description: IP-адрес хранилища. Используется в случае типа iSCSI.
+          type: string
+        discard_max_size:
+          description: |
+            Максимальное количество байтов, которое может быть отброшено базовым хранилищем логического 
+            устройства в одной операции. Значение 0 означает, что устройство не поддерживает функциональность 
+            отбрасывания данных.
+          type: integer
+        discard_zeroes_data:
+          description: |
+            Определяет, стоит ли при повторном чтении считывать как нули ранее отброшенные блоки в базовом 
+            хранилище логического устройства.
+
+            Параметр является устаревшим и всегда имеет значение `false`.
+          type: boolean
+        id:
+          description: Уникальный идентификатор LUN
+          type: string
+        lun_mapping:
+          description: Номер LUN для сопоставления c таргетом iSCSI
+          type: integer
+        password:
+          description: Пароль для подключения
+          type: string
+        paths:
+          description: Количество путей к LUN
+          type: integer
+        port:
+          description: Номер порта, по которому доступен LUN
+          type: integer
+        portal:
+          description: Строка, описывающая параметры портала iSCSI
+          type: string
+        product_id:
+          description: Идентификатор устройства LUN
+          type: string
+        serial:
+          description: Серийный номер
+          type: string
+        size:
+          description: Размер LUN в байтах
+          type: integer
+        status:
+          description: |
+            Статус LUN.
+
+            Возможные значения:
+
+            - `free` - свободен
+            - `unusable` - недоступен для использования
+            - `used` - используется
+          type: string
+          enum:
+            - free
+            - unusable
+            - used
+        storage_domain_id:
+          description: Идентификатор домена хранения.
+          type: string
+        target:
+          description: IQN таргета iSCSI
+          type: string
+        username:
+          description: Имя пользователя для аутентификации
+          type: string
+        vendor_id:
+          description: Идентификатор производителя устройства
+          type: string
+        volume_group_id:
+          description: Идентификатор группы томов
+          type: string
     Network:
       type: object
       description: Представляет логическую сеть
@@ -289,6 +878,297 @@ components:
         - management
         - migration
         - vm
+    Property:
+      type: object
+      properties:
+        name:
+          description: Имя свойства
+          type: string
+        value:
+          description: Значение свойства
+          type: string
+    Qos:
+      type: object
+      description: |
+        Описывает параметры политики QoS.
+
+        В зависимости от типа политики необходимо указать соответствующие атрибуты ограничения (описание атрибутов см. ниже):
+
+        - Для QoS типа `storage`: max_throughput, max_read_throughput, max_write_throughput, max_iops, max_read_iops и max_write_iop.
+        - Для QoS типа `cpu`: cpu_limit.
+        - Для QoS типа `network`: inbound_average, inbound_peak, inbound_burst, outbound_average, outbound_peak и outbound_burst.
+        - Для QoS типа `hostnetwork`: outbound_average_linkshare, outbound_average_upperlimit и outbound_average_realtime.
+      properties:
+        comment:
+          type: string
+          description: Свободный комментарий об объекте
+        description:
+          type: string
+          description: Описание объекта
+        id:
+          type: string
+          description: Уникальный идентификатор
+        name:
+          type: string
+          description: Имя политики
+        type:
+          type: string
+          description: |
+            Тип политики QoS. Допустимы следующие значения:
+
+            - `cpu` - политика, которая применяется к ресурсам с вычислительными возможностями. Назначается профилям ЦП.
+            - `hostnetwork` - политика, которая применяется к сетям хоста. Назначается логическим сетям в параметре QoS сети хоста.
+            - `network` - политика, которая применяется к сетям виртуальных машин. Назначается профилям vNIC.
+            - `storage` - политика, которая применяется с хранилищами. Назначается профилям дисков.
+          enum:
+            - cpu
+            - hostnetwork
+            - network
+            - storage
+        cpu_limit:
+          type: integer
+          description: Ограничение использования ЦП в процентах
+        inbound_average:
+          type: integer
+          description: |
+            Желаемая средняя скорость входящего потока в Мбит/с.
+
+            Используется для настройки сетей виртуальных машин. Если определено, необходимо 
+            также задать параметры `inbound_peak` и `inbound_burst`.
+        inbound_burst:
+          type: integer
+          description: |
+            Объем данных, который может быть передан за один пакет, в МБ.
+
+            Если определено, должны быть также заданы `inbound_average` и `inbound_peak`.
+        inbound_peak:
+          type: integer
+          description: |
+            Максимальная скорость входящего потока в Мбит/с.
+
+            Если определено, необходимо также установить `inbound_average` и `inbound_burst`.
+        max_iops:
+          type: integer
+          description: |
+            Максимально допустимое количество операций чтения и записи в секунду.
+
+            Не должно быть установлено, если заданы `max_read_iops` или `max_write_iops`.
+        max_read_iops:
+          type: integer
+          description: |
+            Максимально допустимое количество операций чтения в секунду.
+
+            Не должно быть установлено, если задан `max_iops`.
+        max_read_throughput:
+          type: integer
+          description: |
+            Максимально допустимая пропускная способность для операций чтения (в МБ/с).
+
+            Не должно быть установлено, если задан `max_throughput`.
+        max_throughput:
+          type: integer
+          description: |
+            Максимально допустимая общая пропускная способность (в МБ/с).
+
+            Не должно быть установлено, если заданы `max_read_throughput` или `max_write_throughput`.
+        max_write_iops:
+          type: integer
+          description: |
+            Максимально допустимое количество операций записи в секунду.
+
+            Не должно быть установлено, если задан `max_iops`.
+        max_write_throughput:
+          type: integer
+          description: |
+            Максимально допустимая пропускная способность для операций записи (в МБ/с).
+
+            Не должно быть установлено, если задан `max_throughput`.
+        outbound_average:
+          type: integer
+          description: |
+            Желаемая средняя скорость исходящего потока в Мбит/с.
+
+            Если определено, необходимо также задать `outbound_peak` и `outbound_burst`.
+        outbound_average_linkshare:
+          type: integer
+          description: |
+            Общий вес. 
+
+            Используется для настройки сетей хоста. Указывает, какая часть пропускной способности логического канала 
+            должна быть выделена конкретной сети по отношению к другим сетям, подключенным к этому логическому 
+            каналу. Точная доля зависит от суммы долей всех сетей на этом канале. По умолчанию это число в 
+            диапазоне 1-100.
+        outbound_average_realtime:
+          type: integer
+          description: |
+            Фиксированная скорость в Мбит/с.
+
+            Используется для настройки сетей хоста. Минимальная пропускная способность, необходимая сети. 
+            Запрашиваемая пропускная способность не гарантируется и зависит от сетевой инфраструктуры и пропускной 
+            способности, запрашиваемой другими сетями по тому же логическому каналу.
+        outbound_average_upperlimit:
+          type: integer
+          description: |
+            Максимальная пропускная способность, которая может использоваться сетью в Мбит/с.
+
+            Если указаны значения `outbound_average_upperlimit` и `outbound_average_realtime`, значение `outbound_average_upperlimit`
+            не должно быть меньше значения `outbound_average_realtime`.
+        outbound_burst:
+          type: integer
+          description: |
+            Объем данных, который может быть отправлен в одном пакете, в МБ.
+
+            Если определено, необходимо также задать `outbound_average` и `outbound_peak`.
+        outbound_peak:
+          type: integer
+          description: |
+            Максимальная скорость исходящего потока в Мбит/с.
+
+            Если определено, необходимо также задать `outbound_average` и `outbound_burst`.
+        data_center:
+          type: object
+          properties:
+            id:
+              type: string
+              description: Идентификатор центра данных, в котором задана политика QoS
+            href:
+              type: string
+              description: Ссылка на центр данных
+    Quota:
+      type: object
+      description: Описывает параметры квоты.
+      properties:
+        description:
+          type: string
+          description: Описание объекта
+        id:
+          type: string
+          description: Уникальный идентификатор
+        name:
+          type: string
+          description: Имя квоты
+        cluster_hard_limit_pct:
+          type: integer
+          description: |
+            Максимально допустимое превышение использования вычислительных ресурсов кластеров.
+
+            Если операция, запрошенная потребителем квоты (например, добавление ОЗУ ВМ)
+            превышает данный лимит, операция будет запрещена.
+
+            Значение указывается в процентах относительно установленного размера квоты.
+
+            **ВАЖНО:** Этот тип ограничения будет срабатывать только в случае принудительного режима квотирования в центре данных. 
+        cluster_soft_limit_pct:
+          type: integer
+          description: |
+            Значение (в процентах) относительно установленного размера квоты на использование 
+            вычислительных ресурсов кластеров, при котором будет формироваться уведомление о приближении к
+            установленному лимиту.
+        data_center:
+          type: object
+          properties:
+            id:
+              type: string
+              description: Идентификатор центра данных, в котором задана квота
+            href:
+              type: string
+              description: Ссылка на центр данных
+        storage_hard_limit_pct:
+          type: integer
+          description: |
+            Максимально допустимое превышение использования вычислительных ресурсов хранилищ.
+
+            Если операция, запрошенная потребителем квоты (например, увеличение размера диска ВМ)
+            превышает данный лимит, операция будет запрещена.
+
+            Значение указывается в процентах относительно установленного размера квоты.
+
+            **ВАЖНО:** Этот тип ограничения будет срабатывать только в случае принудительного режима квотирования в центре данных.
+        storage_soft_limit_pct:
+          type: integer
+          description: Значение (в процентах) относительно установленного размера квоты на использование 
+            ресурсов хранилища, при котором будет формироваться уведомление о приближении к
+            установленному лимиту.
+    QuotaClusterLimit:
+      type: object
+      description: Описывает ограничения на использование вычислительных ресурсов кластеров.
+      properties:
+        id:
+          type: string
+          description: Уникальный идентификатор
+        memory_limit:
+          type: number
+          description: Значение ограничения на использование ОЗУ (в Мб)
+        memory_usage:
+          type: number
+          description: Текущее использование ОЗУ (в Мб)
+        vcpu_limit:
+          type: integer
+          description: Ограничение на использование vCPU
+        vcpu_usage:
+          type: integer
+          description: Текущее количество используемых vCPU
+        quota:
+          type: object
+          description: Квота, к которой относится данный лимит
+          properties:
+            id:
+              type: string
+              description: Идентификатор квоты
+            href:
+              type: string
+              description: Ссылка на квоту
+        cluster:
+          type: object
+          description: |
+            Кластер, к которому относится данный лимит.
+
+            Если задан общий лимит (на все кластеры), данный атрибут не отображается.
+          properties:
+            id:
+              type: string
+              description: Идентификатор квоты
+            href:
+              type: string
+              description: Ссылка на квоту
+    QuotaStorageLimit:
+      type: object
+      description: Описывает ограничения на использование ресурсов хранилищ.
+      properties:
+        id:
+          type: string
+          description: Уникальный идентификатор
+        limit:
+          type: integer
+          description: |
+            Ограничение на использование ресурсов хранилища (в Гб)
+        usage:
+          type: number
+          format: float
+          description: Текущее использование ресурсов хранилища
+        quota:
+          type: object
+          description: Квота, к которой относится данный лимит
+          properties:
+            id:
+              type: string
+              description: Идентификатор квоты
+            href:
+              type: string
+              description: Ссылка на квоту
+        storage_domain:
+          type: object
+          description: |
+            Домен хранения, на который установлен лимит.
+
+            Если установлено общее ограничение (на все домены хранения кластера), данный атрибут не отображается.
+          properties:
+            id:
+              type: string
+              description: Идентификатор домена хранения
+            href:
+              type: string
+              description: Ссылка на домен хранения
     QuotaMode:
       type: string
       description: |
@@ -301,6 +1181,153 @@ components:
         - audit
         - disabled
         - enabled
+    StorageDomain:
+      type: object
+      description: Описывает домен хранения
+      properties:
+        comment:
+          type: string
+          description: Свободный комментарий об объекте
+        description:
+          type: string
+          description: Описание объекта
+        id:
+          type: string
+          description: Уникальный идентификатор
+        name:
+          type: string
+          description: Имя домена хранения
+        available:
+          type: integer
+          description: Объем доступного пространства (в байтах)
+        backup:
+          type: boolean
+          description: |
+            Указывает, является ли домен данных хранилищем резервных копий. 
+
+            Если домен установлен в качестве хранилища резервных копий, то он будет использоваться для хранения 
+            виртуальных машин и шаблонов для целей аварийного восстановления так же, как используется домен 
+            экспорта. Этот атрибут доступен только для домена хранения данных, но не для домена ISO или экспорта. 
+            Пользователь может использовать эту функциональность при создании или 
+            импорте домена хранения данных.
+        block_size:
+          type: integer
+          description: |
+            Указывает размер блока в байтах для домена хранения.
+
+            Можно не указывать, и в этом случае по умолчанию будет установлено значение 512 байт.
+            Не все домены хранения поддерживают все возможные размеры.
+        committed:
+          type: integer
+          description: |
+            Объем выделенного пространства (в байтах).
+
+            Этот атрибут отображает размер выделенного пространства на текущий момент, включая:
+
+            - Актуальный размер предварительно размеченных плавающих и прикрепленных дисков.
+            - Виртуальный или актуальный (в зависимости от того, что больше) размер динамически размечаемых плавающих и прикрепленных дисков.
+        critical_space_action_blocker:
+          type: integer
+          description: Пороговый объем свободного пространства, при котором происходит блокировка аддитивных операций с доменом хранения (создание снимков и дисков, увеличение размера дисков).
+        discard_after_delete:
+          type: boolean
+          description: |
+            Указывает, будут ли удаляться блоки дисков в доменах блочного хранения непосредственно перед удалением самого диска.
+
+            Если `true`, и у диска на этом домене хранения включено значение `wipe_after_delete`, то при удалении диска:
+
+            - Сначала диск стирается.
+            - Затем удаляются его блоки.
+            - И наконец, удаляется диск.
+
+            Обратите внимание, что:
+
+            - `discard_after_delete` всегда будет `false` для неблочных типов хранилищ.
+            - `discard_after_delete` может быть установлен в true, только если домен хранилища поддерживает `discard`.
+        external_status:
+          $ref: "#/components/schemas/ExternalStatus"
+        master:
+          type: boolean
+          description: Указывает, является ли домен хранения мастер-доменом
+        status:
+          type: string
+          description: |
+            Указывает статус домена хранения.
+
+            Возможные значения:
+
+            - `activating` - в процессе активации
+            - `active` - нормальное рабочее состояние
+            - `detaching` - в процессе открепления
+            - `inactive` - неактивен
+            - `locked` - заблокирован
+            - `maintenance` - в режиме обслуживания
+            - `mixed` - имеет несколько статусов
+            - `preparing_for_maintenance` - подготовка к режиму обслуживания
+            - `unattached` - откреплен от центра данных
+            - `unknown` - неизвестный статус
+          enum:
+            - activating
+            - active
+            - detaching
+            - inactive
+            - locked
+            - maintenance
+            - mixed
+            - preparing_for_maintenance
+            - unattached
+            - unknown
+        storage:
+          $ref: '#/components/schemas/HostStorage'
+        storage_format:
+          $ref: "#/components/schemas/StorageFormat"
+        supports_discard:
+          description: |
+            Указывает, поддерживает ли домен блочного хранилища операции отбрасывания данных. Домен хранилища 
+            поддерживает отбрасывание только в том случае, если все логические устройства, из которых он построен, 
+            поддерживают отбрасывание; то есть, если значение параметра discard_max_size каждого логического 
+            устройства больше 0. Это одно из необходимых условий для того, чтобы виртуальному диску в этом домене 
+            хранилища был включен атрибут pass_discard.
+          type: boolean
+        supports_discard_zeroes_data:
+          description: |
+            Указывает, поддерживает ли домен блочного хранилища свойство обнуления данных при их отбрасывании. 
+            Домен хранилища поддерживает свойство обнуления данных при отбрасывании только в том случае, если все 
+            логические устройства, из которых он состоит, поддерживают это свойство; то есть, если значение 
+            параметра discard_zeroes_data каждого логического устройства истинно.
+
+            Этот параметр является устаревшим и его значение всегда `false`.
+        type:
+          $ref: "#/components/schemas/StorageDomainType"
+        used:
+          description: Объем используемого пространства (в байтах)
+          type: integer
+        warning_low_space_indicator:
+          description: Указывает минимальный процент свободного пространства в домене хранения, при котором будет выдано предупреждение.
+          type: integer
+        wipe_after_delete:
+          description: Служит значением по умолчанию для параметра `wipe_after_delete` для дисков в этом домене хранения.
+          type: boolean
+    StorageDomainType:
+      description: |
+        Представляет допустимые типы доменов хранения.
+
+        Возможные значения:
+
+        - `data` - Домены данных используются для хранения дисков и моментальных снимков виртуальных машин и шаблонов в системе.
+        - `export` - Домены экспорта - это временные хранилища, используемые для копирования и перемещения виртуальных машин и шаблонов между центрами обработки данных и средами zVirt.
+        - `image` - В домене Image хранятся образы, которые можно импортировать из внешней системы.
+        - `iso` - В доменах ISO хранятся файлы ISO (или логические CD), используемые для установки и загрузки операционных систем и приложений для виртуальных машин.
+        - `managed_block_storage` - Домены хранения управляемых блоков создаются на блочных устройствах хранения.
+        - `volume` - В доменах томов хранятся логические тома, которые можно использовать в качестве дисков для виртуальных машин.
+      type: string
+      enum:
+        - data
+        - export
+        - image
+        - iso
+        - managed_block_storage
+        - volume
     StorageFormat:
       type: string
       description: |
@@ -319,6 +1346,30 @@ components:
         - v3
         - v4
         - v5
+    StorageType:
+      description: |
+        Представляет тип хранилища домена хранения.
+      type: string
+      enum:
+        - cinder
+        - fcp
+        - glance
+        - glusterfs
+        - iscsi
+        - localfs
+        - managed_block_storage
+        - nfs
+        - posixfs
+    VcpuPin:
+      description: Топология CPU Pinning для сопоставления ЦП виртуальной машины с ЦП хоста.
+      type: object
+      properties:
+        cpu_set:
+          description: Набор CPU
+          type: string
+        vcpu:
+          description: Номер vcpu
+          type: integer
     Version:
       type: object
       properties:
@@ -326,6 +1377,21 @@ components:
           type: integer
         minor:
           type: integer
+    VolumeGroup:
+      description: Описывает группу томов. Применяется к хранилищам типа iSCSI
+      type: object
+      properties:
+        id:
+          description: Уникальный идентификатор
+          type: string
+        logical_units:
+          type: object
+          properties:
+            logical_unit:
+              description: Список LUN
+              type: array
+              items:
+                $ref: '#/components/schemas/LogicalUnit'
 security:
   - oauth2Auth: []
 tags:
@@ -1496,13 +2562,13 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              example:
-                type: network
-                name: limited_vm_network
-                inbound_average: 500
-                inbound_burst: 10
-                inbound_peak: 1000
+              $ref: "#/components/schemas/Qos"
+            example:
+              type: network
+              name: limited_vm_network
+              inbound_average: 500
+              inbound_burst: 10
+              inbound_peak: 1000
       parameters:
         - name: Accept
           in: header
@@ -1520,7 +2586,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/Qos"
               example:
                 inbound_average: '500'
                 inbound_burst: '10'
@@ -1560,6 +2626,12 @@ paths:
             application/json:
               schema:
                 type: object
+                properties:
+                  qos:
+                    type: array
+                    description: Список политик QoS
+                    items:
+                      $ref: "#/components/schemas/Qos"
               example:
                 qos:
                   - inbound_average: '500'
@@ -1592,7 +2664,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/Qos"
               example:
                 inbound_average: '500'
                 inbound_burst: '10'
@@ -1615,9 +2687,9 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              example:
-                inbound_burst: 100
+              $ref: "#/components/schemas/Qos"
+            example:
+              inbound_burst: 100
       parameters:
         - name: Accept
           in: header
@@ -1641,7 +2713,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/Qos"
               example:
                 inbound_average: '500'
                 inbound_burst: '100'
@@ -1679,6 +2751,10 @@ paths:
             application/json:
               schema:
                 type: object
+                properties:
+                  status:
+                    type: string
+                    description: Результат выполнения запроса
               example:
                 status: complete
   /ovirt-engine/api/datacenters/{datacenter:id}/quotas:
@@ -1693,13 +2769,13 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              example:
-                name: new_quota
-                cluster_soft_limit_pct: 50
-                cluster_hard_limit_pct: 70
-                storage_soft_limit_pct: 70
-                storage_hard_limit_pct: 90
+              $ref: "#/components/schemas/Quota"
+            example:
+              name: new_quota
+              cluster_soft_limit_pct: 50
+              cluster_hard_limit_pct: 70
+              storage_soft_limit_pct: 70
+              storage_hard_limit_pct: 90
       parameters:
         - name: Accept
           in: header
@@ -1717,7 +2793,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/Quota"
               example:
                 cluster_hard_limit_pct: '70'
                 cluster_soft_limit_pct: '50'
@@ -1774,6 +2850,12 @@ paths:
             application/json:
               schema:
                 type: object
+                properties:
+                  quota:
+                    type: array
+                    description: Список квот
+                    items:
+                      $ref: "#/components/schemas/Quota"
               example:
                 quota:
                   - cluster_hard_limit_pct: '20'
@@ -1823,7 +2905,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/Quota"
               example:
                 cluster_hard_limit_pct: '70'
                 cluster_soft_limit_pct: '50'
@@ -1859,11 +2941,11 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              example:
-                description: All resources limited
-                cluster_hard_limit_pct: 10
-                storage_hard_limit_pct: 20
+              $ref: "#/components/schemas/Quota"
+            example:
+              description: All resources limited
+              cluster_hard_limit_pct: 10
+              storage_hard_limit_pct: 20
       parameters:
         - name: Accept
           in: header
@@ -1887,7 +2969,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/Quota"
               example:
                 cluster_hard_limit_pct: '10'
                 cluster_soft_limit_pct: '50'
@@ -1936,6 +3018,10 @@ paths:
             application/json:
               schema:
                 type: object
+                properties:
+                  status:
+                    type: string
+                    description: Результат выполнения запроса
               example:
                 status: complete
   /ovirt-engine/api/datacenters/{datacenter:id}/quotas/{quota:id}/quotaclusterlimits:
@@ -1944,16 +3030,16 @@ paths:
         - Центры данных
       summary: Создание лимитов на вычислительные ресурсы
       description: >-
-        Создание глобальных лимитов (для всех кластеров) на использование vCPU и
+        Создание лимитов на использование vCPU и
         ОЗУ для указанной квоты. Необходимые значения передаются в теле запроса
       requestBody:
         content:
           application/json:
             schema:
-              type: object
-              example:
-                memory_limit: 0.9
-                vcpu_limit: 2
+              $ref: "#/components/schemas/QuotaClusterLimit"
+            example:
+              memory_limit: 0.9
+              vcpu_limit: 2
       parameters:
         - name: Accept
           in: header
@@ -1971,7 +3057,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/QuotaClusterLimit"
               example:
                 memory_limit: 0.8994140625
                 memory_usage: 0
@@ -2004,6 +3090,12 @@ paths:
             application/json:
               schema:
                 type: object
+                properties:
+                  quota_cluster_limit:
+                    type: array
+                    description: Список лимитов вычислительных ресурсов
+                    items:
+                      $ref: "#/components/schemas/QuotaClusterLimit"
               example:
                 quota_cluster_limit:
                   - memory_limit: -1
@@ -2021,9 +3113,9 @@ paths:
     get:
       tags:
         - Центры данных
-      summary: Просмотр набора лимитов на вычислительные ресурсы
+      summary: Просмотр лимита на вычислительные ресурсы
       description: >-
-        Возвращает информацию об указанном наборе лимитов на использование vCPU
+        Возвращает информацию об указанном лимите на использование vCPU
         и ОЗУ
       parameters:
         - name: Accept
@@ -2037,7 +3129,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/QuotaClusterLimit"
               example:
                 memory_limit: 0.8994140625
                 memory_usage: 0
@@ -2074,6 +3166,10 @@ paths:
             application/json:
               schema:
                 type: object
+                properties:
+                  status:
+                    type: string
+                    description: Результат выполнения запроса
               example:
                 status: complete
   /ovirt-engine/api/datacenters/{datacenter:id}/quotas/{quota:id}/quotastoragelimits:
@@ -2082,16 +3178,16 @@ paths:
         - Центры данных
       summary: Создание лимитов на ресурсы хранилища
       description: >-
-        Создание глобальных лимитов (для всех доменов хранения) на использование
+        Создание лимитов на использование
         хранилища для указанной квоты. Необходимые значения передаются в теле
         запроса
       requestBody:
         content:
           application/json:
             schema:
-              type: object
-              example:
-                limit: 15
+              $ref: "#/components/schemas/QuotaStorageLimit"
+            example:
+              limit: 15
       parameters:
         - name: Accept
           in: header
@@ -2109,7 +3205,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/QuotaStorageLimit"
               example:
                 limit: '15'
                 usage: 0
@@ -2140,6 +3236,12 @@ paths:
             application/json:
               schema:
                 type: object
+                properties:
+                  quota_storage_limit:
+                    type: array
+                    description: Список лимитов
+                    items:
+                      $ref: "#/components/schemas/QuotaStorageLimit"
               example:
                 quota_storage_limit:
                   - limit: '15'
@@ -2171,7 +3273,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/QuotaStorageLimit"
               example:
                 limit: '15'
                 usage: 0
@@ -2206,6 +3308,10 @@ paths:
             application/json:
               schema:
                 type: object
+                properties:
+                  status:
+                    type: string
+                    description: Результат выполнения запроса
               example:
                 status: complete
   /ovirt-engine/api/datacenters/{datacenter:id}/setmaster:
@@ -2219,9 +3325,23 @@ paths:
           application/json:
             schema:
               type: object
-              example:
+              properties:
                 storage_domain:
-                  name: data
+                  type: object
+                  description: |
+                    Идентифицирует домен хранения, которому необходимо передать роль "мастер".
+
+                    Идентификация возможна по атрибутам `name` или `id`.
+                  properties:
+                    name:
+                      type: string
+                      description: Имя целевого домена хранения
+                    id:
+                      type: string
+                      description: Идентификатор целевого домена хранения
+            example:
+              storage_domain:
+                name: data
       parameters:
         - name: Accept
           in: header
@@ -2239,7 +3359,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/JobOK"
               example:
                 job:
                   href: /ovirt-engine/api/jobs/bd4b8de9-47f2-437b-bb0e-a9a789baadab
@@ -2250,7 +3370,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/Fault"
               example:
                 detail: >-
                   [Cannot switch master storage domain. The storage domain is
@@ -2261,14 +3381,25 @@ paths:
       tags:
         - Центры данных
       summary: Подключение домена хранения
-      description: Подключение к центру данных указанного домена хранения
+      description: Подключает к центру данных указанный существующий домен хранения
       requestBody:
         content:
           application/json:
             schema:
               type: object
-              example:
-                name: new-domain
+              description: |
+                В теле запроса ожидается идентифкационный атрибут подключаемого домена хранения.
+
+                Идентификация возможна по атрибутам `name` или `id`.
+              properties:
+                name:
+                  type: string
+                  description: Имя подключаемого домена хранения
+                id:
+                  type: string
+                  description: Идентификатор подключаемого домена хранения
+            example:
+              name: new-domain
       parameters:
         - name: Accept
           in: header
@@ -2286,7 +3417,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/StorageDomain'
               example:
                 available: '34359738368'
                 backup: 'false'
@@ -2364,7 +3495,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/JobOK'
               example:
                 job:
                   href: /ovirt-engine/api/jobs/819e31fc-0a96-40d4-8247-447c6b2b4172
@@ -2424,7 +3555,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/JobOK'
               example:
                 job:
                   href: /ovirt-engine/api/jobs/5eb83bc2-ddb6-4aaf-b9b1-a7914b646561
@@ -2473,7 +3604,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/JobOK"
               example:
                 job:
                   href: /ovirt-engine/api/jobs/63bd6b2d-5b22-47f3-a1f9-9cd5f3eaf8fb
@@ -2499,16 +3630,16 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              example:
-                name: demoCL
-                comment: Simple cluster
-                description: Cluster for API demo
-                data_center:
-                  id: 828d0759-87b4-4e64-b569-63755a6fac65
-                cpu:
-                  architecture: x86_64
-                  type: Intel Cascadelake Server Family
+              $ref: "#/components/schemas/Cluster"
+            example:
+              name: demoCL
+              comment: Simple cluster
+              description: Cluster for API demo
+              data_center:
+                id: 828d0759-87b4-4e64-b569-63755a6fac65
+              cpu:
+                architecture: x86_64
+                type: Intel Cascadelake Server Family
       parameters:
         - name: Accept
           in: header
@@ -2526,7 +3657,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/Cluster"
               example:
                 ballooning_enabled: 'true'
                 bios_type: q35_sea_bios
@@ -2704,6 +3835,12 @@ paths:
             application/json:
               schema:
                 type: object
+                properties:
+                  cluster:
+                    description: Список кластеров
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Cluster"
               example:
                 cluster:
                   - ballooning_enabled: 'true'
@@ -2857,7 +3994,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/Cluster"
               example:
                 ballooning_enabled: 'true'
                 bios_type: q35_sea_bios
@@ -2986,9 +4123,9 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              example:
-                comment: Updated comment
+              $ref: "#/components/schemas/Cluster"
+            example:
+              comment: Updated comment
       parameters:
         - name: Accept
           in: header
@@ -3012,7 +4149,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/Cluster"
               example:
                 ballooning_enabled: 'true'
                 bios_type: q35_sea_bios
@@ -4258,6 +5395,13 @@ paths:
           application/json:
               schema:
                 type: object
+                properties:
+                  name:
+                    description: Имя существующей сети
+                    type: string
+                  id:
+                    description: Идентификатор существующей сети
+                    type: string
               example:
                 name: test_network
       parameters:
@@ -4277,7 +5421,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/Network"
               example:
                 display: 'false'
                 mtu: '1500'
@@ -4330,6 +5474,12 @@ paths:
             application/json:
               schema:
                 type: object
+                properties:
+                  network:
+                    description: Список сетей кластера
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Network"
               example:
                 network:
                   - display: 'true'
@@ -4404,7 +5554,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/Network"
               example:
                 display: 'false'
                 mtu: '0'
@@ -4444,9 +5594,9 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              example:
-                required: 'false'
+              $ref: "#/components/schemas/Network"
+            example:
+              required: 'false'
       parameters:
         - name: Accept
           in: header
@@ -4464,7 +5614,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/Network"
               example:
                 display: 'false'
                 mtu: '0'
